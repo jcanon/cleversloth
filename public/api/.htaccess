@@ -1,0 +1,7 @@
+Options -Indexes
+<FilesMatch "\.(php|json|log)$">
+  Header always set X-Content-Type-Options "nosniff"
+</FilesMatch>
+<Files "config.php">
+  Require all denied
+</Files>
