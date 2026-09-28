@@ -5,7 +5,7 @@ declare(strict_types=1);
  * Lightweight contact endpoint for SiteGround PHP hosting.
  *
  * Protections:
- * - same-origin JSON requests and per-session CSRF token
+ * - same-origin form requests and per-session CSRF token
  * - invisible honeypot and minimum completion time
  * - per-IP cooldown plus hourly rate limit
  * - strict length, format, and newline validation
@@ -28,6 +28,7 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
 
 $config = require __DIR__ . '/config.php';
+require_once __DIR__ . '/smtp.php';
 
 function respond(int $status, array $body): never {
     http_response_code($status);
@@ -110,15 +111,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     respond(405, ['ok' => false, 'message' => 'Method not allowed.']);
 }
-if (($_SERVER['CONTENT_TYPE'] ?? '') !== 'application/json') {
+$contentType = strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '', 2)[0]));
+if (!in_array($contentType, ['application/json', 'application/x-www-form-urlencoded'], true)) {
     respond(415, ['ok' => false, 'message' => 'Unsupported request type.']);
 }
-if (!hash_equals(csrfToken(), $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) {
+$input = $contentType === 'application/json'
+    ? json_decode(file_get_contents('php://input'), true)
+    : $_POST;
+if (!is_array($input)) respond(400, ['ok' => false, 'message' => 'Invalid form data.']);
+// Accept a header for backward-compatible JSON submissions and a body token for standard forms.
+$submittedCsrf = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($input['csrfToken'] ?? '');
+if (!is_string($submittedCsrf) || !hash_equals(csrfToken(), $submittedCsrf)) {
     respond(403, ['ok' => false, 'message' => 'Your form session expired. Refresh the page and try again.']);
 }
-
-$input = json_decode(file_get_contents('php://input'), true);
-if (!is_array($input)) respond(400, ['ok' => false, 'message' => 'Invalid form data.']);
 if (($input['website'] ?? '') !== '') respond(200, ['ok' => true]); // Honeypot: accept silently.
 $startedAt = filter_var($input['formStartedAt'] ?? null, FILTER_VALIDATE_INT);
 if (!$startedAt || (microtime(true) * 1000 - $startedAt) < ($config['minimum_form_seconds'] * 1000)) {
@@ -134,7 +139,9 @@ try {
     $message = is_string($input['message'] ?? null) ? trim($input['message']) : '';
     if ($message === '' || mb_strlen($message) > 3000) throw new InvalidArgumentException('Please provide a short project description.');
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Please enter a valid email address.');
-    if (($input['privacyAccepted'] ?? false) !== true) throw new InvalidArgumentException('Please agree to the Privacy Policy before sending.');
+    if (($input['privacyAccepted'] ?? false) !== true && ($input['privacyAccepted'] ?? '') !== 'true') {
+        throw new InvalidArgumentException('Please agree to the Privacy Policy before sending.');
+    }
 } catch (InvalidArgumentException $exception) {
     respond(422, ['ok' => false, 'message' => $exception->getMessage()]);
 }
@@ -148,14 +155,16 @@ enforceRateLimit($ip, $config);
 $body = "New Clever Sloth LLC website inquiry\n\n"
     . "Name: {$name}\nEmail: {$email}\nCompany: {$company}\nPhone: {$phone}\n"
     . "Service: {$projectType}\n\nMessage:\n{$message}\n";
-$headers = [
-    'From: ' . $config['from_name'] . ' <' . $config['from_email'] . '>',
-    'Reply-To: ' . $email,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=UTF-8',
-];
+$sent = ($config['mail_transport'] ?? '') === 'smtp'
+    ? smtpSend($config, $config['recipient_email'], $email, 'New website inquiry', $body)
+    : mail($config['recipient_email'], 'New website inquiry', $body, implode("\r\n", [
+        'From: ' . $config['from_name'] . ' <' . $config['from_email'] . '>',
+        'Reply-To: ' . $email,
+        'MIME-Version: 1.0',
+        'Content-Type: text/plain; charset=UTF-8',
+    ]));
 
-if (!mail($config['recipient_email'], 'New website inquiry', $body, implode("\r\n", $headers))) {
+if (!$sent) {
     error_log('Clever Sloth contact form mail delivery failed.');
     respond(503, ['ok' => false, 'message' => 'Your message could not be sent. Please email info@cleversloth.com.']);
 }

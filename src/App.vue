@@ -28,10 +28,10 @@ function closeMenu() {
         type="button"
         :aria-expanded="isMenuOpen"
         aria-controls="primary-navigation"
+        :aria-label="isMenuOpen ? 'Close navigation menu' : 'Open navigation menu'"
         @click="isMenuOpen = !isMenuOpen"
       >
-        <span>Menu</span>
-        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
           <path d="M4 7h16M4 12h16M4 17h16" />
         </svg>
       </button>
@@ -66,8 +66,8 @@ function closeMenu() {
       <p>Thoughtful web development for growing businesses.</p>
       <nav aria-label="Footer navigation">
         <RouterLink :to="{ path: '/', hash: '#services' }">Services</RouterLink>
-        <RouterLink :to="{ path: '/', hash: '#about' }">About</RouterLink>
-        <RouterLink :to="{ path: '/', hash: '#contact' }">Contact</RouterLink>
+        <RouterLink :to="{ path: '/', hash: '#about' }">Why Clever Sloth</RouterLink>
+        <RouterLink :to="{ path: '/', hash: '#process' }">Our process</RouterLink>
       </nav>
     </div>
     <div class="container footer-bottom">

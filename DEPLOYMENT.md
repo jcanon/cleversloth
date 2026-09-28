@@ -24,3 +24,9 @@ Run these commands from this directory: npm install, npm run dev, and npm run bu
 
 Use PHP 8.1 or newer for api/contact.php. SiteGround’s current PHP versions meet that requirement; select PHP 8.1+ in Site Tools if needed.
 
+# Contact mail delivery
+
+This site uses authenticated SMTP rather than PHP's `mail()` function. Before uploading, open `public/api/config.php` and enter the exact outgoing SMTP server and mailbox password for `info@cleversloth.com`. In SiteGround, find those values in **Site Tools > Email > Accounts > Mail Configuration**. Leave the password in that server-only file; do not put it in `src/`, browser settings, or version control.
+
+For SiteGround's implicit TLS settings, use port `465` and `smtp_encryption` `ssl`. If SiteGround provides STARTTLS instead, use its supplied port (normally `587`) and set `smtp_encryption` to `tls`.
+

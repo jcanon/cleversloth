@@ -23,11 +23,17 @@ const showTurnstile = computed(() => Boolean(config.turnstileSiteKey));
 
 async function fetchCsrfToken() {
   try {
-    const response = await fetch(config.contactApiUrl || '/api/contact.php', { credentials: 'same-origin' });
+    const response = await fetch(config.contactApiUrl || '/api/contact.php', {
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+    });
+    if (!response.ok) return false;
     const body = await response.json();
     csrfToken.value = body.csrfToken || '';
+    return Boolean(csrfToken.value);
   } catch {
-    // The form will explain the issue on submission. Do not expose server details.
+    return false;
   }
 }
 
@@ -54,8 +60,11 @@ function loadTurnstile() {
 async function submitForm() {
   formError.value = '';
   if (!csrfToken.value) {
-    formError.value = 'The form could not start securely. Please refresh the page and try again.';
-    return;
+    const didRefreshToken = await fetchCsrfToken();
+    if (!didRefreshToken) {
+      formError.value = 'The form could not start securely. Please refresh the page and try again.';
+      return;
+    }
   }
   if (showTurnstile.value && !turnstileToken.value) {
     formError.value = 'Please complete the security check before sending your message.';
@@ -64,16 +73,25 @@ async function submitForm() {
 
   isSubmitting.value = true;
   try {
-    const response = await fetch(config.contactApiUrl || '/api/contact.php', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken.value },
-      body: JSON.stringify({
-        ...form.value,
-        formStartedAt: startedAt.value,
+    const send = () => {
+      const payload = new URLSearchParams({
+        ...Object.fromEntries(Object.entries(form.value).map(([key, value]) => [key, String(value)])),
+        csrfToken: csrfToken.value,
+        formStartedAt: String(startedAt.value),
         turnstileToken: turnstileToken.value,
-      }),
-    });
+      });
+      return fetch(config.contactApiUrl || '/api/contact.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: payload,
+      });
+    };
+    let response = await send();
+    // Mobile browsers may restore an older page session after backgrounding.
+    // Refresh once on a CSRF rejection, then submit with the new same-origin token.
+    if (response.status === 403 && await fetchCsrfToken()) response = await send();
     const body = await response.json();
     if (!response.ok || !body.ok) {
       formError.value = body.message || 'Your message could not be sent. Please try again later.';

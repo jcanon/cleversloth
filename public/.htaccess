@@ -1,6 +1,15 @@
 Options -Indexes
 DirectoryIndex index.html
 
+# The contact form uses a Secure PHP session cookie for CSRF protection.
+# Keep every visitor on HTTPS so phone browsers can retain that cookie.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
 # Security headers for the static Vue application.
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"

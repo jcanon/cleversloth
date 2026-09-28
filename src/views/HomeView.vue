@@ -73,8 +73,11 @@ const process = [
         <p class="eyebrow">THE CLEVER SLOTH WAY</p>
         <h2>Move thoughtfully.<br />Build confidently.</h2>
         <p>The name is a reminder: taking time to understand the problem makes the solution better.</p>
-        <div class="panel-rule"></div><div class="experience-number">20<span>+</span></div>
-        <p class="experience-label">years of hands-on web<br />and application experience</p>
+        <div class="panel-rule"></div>
+        <div class="experience-summary">
+          <div class="experience-number">20<span>+</span></div>
+          <p class="experience-label">years of hands-on web<br />and application experience</p>
+        </div>
         <p class="experience-context">Experience spanning consulting, public service, higher education, healthcare, and mission-driven organizations.</p>
         <img class="panel-leaf" src="/icons/leaf.svg" alt="" width="100" height="100" />
       </article>
